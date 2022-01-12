@@ -1,0 +1,106 @@
+---
+# tasks file for tp_nginx
+
+
+- name: Installation Nginx repository
+  yum:
+   name: http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+   state: present
+
+- name: Installation Nginx repository
+  yum:
+   name: nginx
+   state: present
+
+- name: Création dossier /var/www/{{ item }}/html
+  file:
+   path: /var/www/{{ item }}/html
+   state: directory
+   owner: jpereira
+   group: jpereira
+  loop:
+   "{{ user }}"
+
+- name: Droits 755 sur /var/www
+  file:
+   path: /var/www
+   mode: '0755'
+
+- name: Création du fichier html "{{ item }}"
+  copy:
+   dest: /var/www/{{ item }}/html/index.html
+   content: |
+     <html>
+       <head>
+         <title>Welcome to {{ item }}!</title>
+       </head>
+       <body>
+         <h1>Success! The {{ item }} server block is working!</h1>
+       </body>
+     </html>
+  loop:
+   "{{ user }}"
+
+- name: Création de sites available
+  file:
+    path: /etc/nginx/sites-available
+    state: directory
+
+- name: Création de sites enable
+  file:
+    path: /etc/nginx/sites-enabled
+    state: directory
+
+- name: Ajout sites enable dans nginx.conf
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertafter: '\tinclude /etc/nginx/conf.d/*.conf;\n'
+    line: '{{ item }}'
+    state: present
+  loop:
+   "{{ line }}"
+
+- name: Ramener le fichier du remote au master 
+  fetch: src=/etc/nginx/conf.d/default.conf dest=buffer/{{ item }}.conf flat=yes
+  loop:
+   "{{ user }}"
+
+- name: Copie du fichier du master au remote
+  copy: src=buffer/{{ item }}.conf dest=/etc/nginx/sites-available/{{ item }}.conf
+  loop:
+   "{{ user }}"
+
+- name: Changement du server name pour
+  replace: 
+    path: /etc/nginx/sites-available/{{ item }}.conf
+    after: 'server_name  '
+    before: ';'
+    regexp: '^localhost$'
+    replace: '{{ item }} www.{{ item }}'
+  loop:
+   "{{ user }}"
+
+- name: Changement du root pour  "{{ user }}"
+  replace:
+    path: /etc/nginx/sites-available/{{ item }}.conf
+    after: 'root   '
+    before: ';'
+    regexp: '^/usr/share/nginx/html$'
+    replace: '/var/www/{{ item }}/html'
+  loop:
+   "{{ user }}"
+
+- name: Création des liens de sites-available vers sites-enable
+  copy:
+    src: /etc/nginx/sites-available/{{ item }}.conf
+    dest: /etc/nginx/sites-enabled/{{ item }}.conf
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+  loop:
+   "{{ user }}"
+
+- name: Démarrage du service NGINX
+  systemd:
+    state: started
+    name: nginx  

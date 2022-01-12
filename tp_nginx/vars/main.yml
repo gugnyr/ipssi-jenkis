@@ -1,0 +1,11 @@
+---
+# vars file for tp_nginx
+
+user:
+ - jpereira.com
+ - jeanclaude.com
+
+line:
+ - include /etc/nginx/sites-enabled/*.conf;
+ 
+
